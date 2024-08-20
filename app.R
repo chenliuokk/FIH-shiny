@@ -4,7 +4,9 @@ library(shinythemes)
 library(shinydashboard)
 library(ggpubr)
 library(knitr)
+library(tidyverse)
 options(digits = 22)
+setwd("D:\\Git\\FIH")
 #------------------------------title-----------------------------------------------#
 header <- dashboardHeader(
   title = "DosePredict"
@@ -21,7 +23,7 @@ sidebar <- dashboardSidebar(
 )
 body <- dashboardBody(tabItems(
   # First tab content
-  tabItem(tabName = "noael",
+  tabItem(tabName = "noael",                                                                                      #@@补充参考值表，参考指导原则
           fluidRow(
             box(title = "Mouse:", status = "primary", solidHeader = TRUE,width = 3,
                 collapsible = TRUE,
@@ -30,7 +32,7 @@ body <- dashboardBody(tabItems(
             ),
             box(title = "Rat:", status = "primary", solidHeader = TRUE,width = 3,
                 collapsible = TRUE,
-                numericInput("BW_r", "The weight of rat(kg):", 0.15, min = 0, max = 10000,step = 0.00000000001),
+                numericInput("BW_r", "The weight of rat(kg):", 0.30, min = 0, max = 10000,step = 0.00000000001),  #@@大鼠默认0.3kg
                 numericInput("Dose_r", "The dose of rat(mg/kg):", 50, min = 0, max = Inf,step = 0.00000000001)
             ),
             box(title = "Begale:", status = "primary", solidHeader = TRUE,width = 3,
@@ -40,12 +42,12 @@ body <- dashboardBody(tabItems(
             ),
             box(title = "Monkey:", status = "primary", solidHeader = TRUE,width = 3,
                 collapsible = TRUE, 
-                numericInput("BW_mo", "The weight of monkey(kg):", 3, min = 0, max = 10000,step = 0.00000000001),
+                numericInput("BW_mo", "The weight of monkey(kg):", 3, min = 0, max = 10000,step = 0.00000000001),  
                 numericInput("Dose_mo", "The dose of monkey(mg/kg):", 10, min = 0, max = 10000,step = 0.00000000001)
             ),
             box(title = "Human:", status = "primary", solidHeader = TRUE,width = 3,
                 collapsible = TRUE, 
-                numericInput("BW_h", "The weight of human(kg):", 60, min = 0, max = 10000,step = 0.00000000001)
+                numericInput("BW_h", "The weight of human(kg):", 60, min = 0, max = 10000,step = 0.00000000001)   
             ),
             box(title = "Safety factor", status = "primary", solidHeader = TRUE,width = 3,
                 collapsible = TRUE, 
@@ -55,13 +57,13 @@ body <- dashboardBody(tabItems(
           fluidRow(
             column(6, dataTableOutput("table1")
             ),
-            column(6, plotOutput("plot1")
+            column(6, img(src = "www/p1.png", width = "100%")
             )
           )
   ),
   # Second tab content
-  tabItem(tabName = "allometricscaling",
-          tabBox(id = "tabset1", width = "100%",
+  tabItem(tabName = "allometricscaling",                     #@@补充参考值表，#食蟹猴5kg#大鼠0.3kg#小鼠0.03kg#人体重建议70kg #@@删除二种属的“Allometric scaling”结果的展示
+          tabBox(id = "tabset1", width = "100%",             #@@补充a值、b值、人体CL值   #@@"The AUC of animal(mg·min/ml):"这部分更改描述，直接点描述（"参考AUC"，"预估人体AUC"之类的）或者直接只写个AUC
                  tabPanel("Two animals",
                           tags$style(type='text/css', 
                                      ".nav-tabs {font-size: 20px} "),
@@ -198,7 +200,7 @@ body <- dashboardBody(tabItems(
                  )
           )
   ),
-  # Third tab
+  # Third tab                                                                                                    #@@把参考体重改一改，也列一个参考值表  #@@The PK parameter of rat单位更改  #@@#@@补充a值、b值、人体CL值  #@@更改结果单位显示更清楚   #@@"The AUC of animal(mg·min/ml):"这部分更改描述，直接点描述（"参考AUC"，"预估人体AUC"之类的）或者直接只写个AUC
   tabItem(tabName = "clts",
           fluidRow(
             box(title = "Rat:", status = "primary", solidHeader = TRUE,width = 4,
@@ -247,18 +249,26 @@ server<-function(input,output){
   #---------------------------------------------------------------------------------------------------------#
   #---------------------------------------------Noael method------------------------------------------------#
   #---------------------------------------------------------------------------------------------------------#
-  BW <- reactive(1000*c(input$BW_m, input$BW_r, input$BW_b, input$BW_mo, input$BW_h))  #g
+  BW <- reactive(1000*c(input$BW_m, input$BW_r, input$BW_b, input$BW_mo, input$BW_h))  #g                     #@@标注人的HED剂量和MRSD剂量，用括号或其他符号标注清楚【单位】
   Dose <- reactive(c(input$Dose_m, input$Dose_r, input$Dose_b, input$Dose_mo))  #mg/kg
   Km <- reactive(10*BW()/10^(0.698*log(BW(),10)+0.8762))
   Dose_h <- reactive(Dose()/(Km()[5]/Km()[1:4])/input$Factor)
-  data <- reactive(data.frame("Method" = c("Mouse extrapolated to human", "Rat extrapolated to human", 
-                                           "Begale extrapolated to human","Monkey extrapolated to human"),
-                              "Dose_h(mg)" = Dose_h()
+  data <- reactive(tibble("Method" = c("Mouse", "Rat", 
+                                       "Begale","Monkey"),
+                              "HED_human[mg]" = Dose_h()*input$Factor,
+                              "MRSD_human[mg]" = Dose_h()
   )
   )
+  #.........@@                                                                                               #@@此段作为参考，表头要标注清楚
+  #data <- reactive(data.frame("Method" = c("Mouse", "Rat", 
+  #                                         "Begale","Monkey"),
+  #                            "HED_human(mg)" = Dose_h()*input$Factor,
+  #                            "MRSD_human(mg)" = Dose_h()
+  #))
+  #.........@
   #---------------------------------------------------------------------------------------------------------#
   #--------------------------------------------AS method&FICM-----------------------------------------------#
-  #---------------------------------------------------------------------------------------------------------#
+  #---------------------------------------------------------------------------------------------------------#  #@@全部代码增加些注释，注释关键的点，方便以后维护
   # two animals
   PK2 <- reactive(c(input$PK21, input$PK22))
   BW2 <- reactive(c(input$BW21, input$BW22))
@@ -319,10 +329,9 @@ server<-function(input,output){
   
   data5 <- reactive(data.frame("Method" = c("CL-TS(rat-dog)"),
                                "Dose_h(mg)" = c(Dose5())))
+ 
   
-  output$table1 <- renderDataTable({
-    data()
-  })
+
   #---------------------------------------------------------------------------------------------------------#
   #-------------------------------------AS model(exponent = 0.75)-------------------------------------------#
   #---------------------------------------------------------------------------------------------------------#
@@ -343,6 +352,9 @@ server<-function(input,output){
                                  vjust = 0.5),               # Adjust label parameters
                ggtheme = theme_pubr()                        # ggplot2 theme
     )
+  })
+  output$table1 <- renderDataTable({
+    data()
   })
   output$table2 <- renderDataTable({
     data2()
@@ -379,3 +391,8 @@ server<-function(input,output){
   
 }  
 shinyApp(ui,server)     
+
+
+
+
+
