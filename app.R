@@ -6,7 +6,6 @@ library(ggpubr)
 library(knitr)
 library(tidyverse)
 options(digits = 22)
-setwd("D:\\Git\\FIH")
 #------------------------------title-----------------------------------------------#
 header <- dashboardHeader(
   title = "DosePredict"
@@ -57,8 +56,13 @@ body <- dashboardBody(tabItems(
           fluidRow(
             column(6, dataTableOutput("table1")
             ),
-            column(6, img(src = "www/p1.png", width = "100%")
+            column(6, img(src = base64enc::dataURI(file="D:\\R Working Directory\\FIH\\FIH\\www\\p1.png", mime="image/png"),
+                          height = 440, width = 800)
             )
+          ),
+          fluidRow(
+            tags$a(href = "https://www.cde.org.cn/zdyz/domesticinfopage?zdyzIdCODE=5a4d762d72643cb695168a8c568aa7e3", 
+                   tags$p(style = 'color: red;', '点击这里下载《健康成年志愿者首次临床试验药物最大推荐起始剂量的估算指导原则》'))
           )
   ),
   # Second tab content
@@ -112,36 +116,36 @@ body <- dashboardBody(tabItems(
                  tabPanel("Three animals",
                           tags$style(type='text/css', 
                                      ".nav-tabs {font-size: 20px} "),
-                          fluidRow(box(title = "Animal1:", status = "primary", solidHeader = TRUE,width = 3,
+                          fluidRow(box(title = "Mouse:", status = "primary", solidHeader = TRUE,width = 3,
                                        collapsible = TRUE,
-                                       numericInput("BW31", "The weight of animal1(kg):", 1, min = 0, max = Inf,step = 0.00000000001),
+                                       numericInput("BW31", "The weight of animal1(kg):", 0.03, min = 0, max = Inf,step = 0.00000000001),
                                        numericInput("PK31", "The CL of animal1(ml/min):", 10, min = 0, max = Inf,step = 0.00000000001)
                           ),
-                          box(title = "Animal2:", status = "primary", solidHeader = TRUE,width = 3,
+                          box(title = "Rat:", status = "primary", solidHeader = TRUE,width = 3,
                               collapsible = TRUE,
-                              numericInput("BW32", "The weight of animal2(kg):", 10, min = 0, max = Inf,step = 0.00000000001),
+                              numericInput("BW32", "The weight of animal2(kg):", 0.25, min = 0, max = Inf,step = 0.00000000001),
                               numericInput("PK32", "The CL of animal2(ml/min):", 100, min = 0, max = Inf,step = 0.00000000001)
                           ),
-                          box(title = "Animal3:", status = "primary", solidHeader = TRUE,width = 3,
+                          box(title = "Dog:", status = "primary", solidHeader = TRUE,width = 3,
                               collapsible = TRUE,
-                              numericInput("BW33", "The weight of animal3(kg):", 4, min = 0, max = Inf,step = 0.00000000001),
+                              numericInput("BW33", "The weight of animal3(kg):", 15, min = 0, max = Inf,step = 0.00000000001),
                               numericInput("PK33", "The CL of animal3(ml/min):", 21.2, min = 0, max = Inf,step = 0.00000000001)
                           ),
                           box(title = "Human:", status = "primary", solidHeader = TRUE,width = 3,
                               collapsible = TRUE,
-                              numericInput("BW3_h", "The weight of human(kg):", 60, min = 0, max = Inf,step = 0.00000000001)
+                              numericInput("BW3_h", "The weight of human(kg):", 70, min = 0, max = Inf,step = 0.00000000001)
                           )
                           ),
                           fluidRow(
-                            box(title = "The AUC of animal", status = "primary", solidHeader = TRUE,width = 3,
+                            box(title = "预估人体AUC", status = "primary", solidHeader = TRUE,width = 3,
                                 collapsible = TRUE,
                                 numericInput("AUC3", "AUC(mg·min/ml):", 60, min = 0, max = Inf,step = 0.00000000001)
                             ),
-                            box(title = "Fraction unbound of rat", status = "primary", solidHeader = TRUE,width = 3,
+                            box(title = "Fraction unbound in rat", status = "primary", solidHeader = TRUE,width = 3,
                                 collapsible = TRUE,
                                 numericInput("fu_r3", "fu_r:", 0.4, min = 0, max = 1,step = 0.00000000001)
                             ),
-                            box(title = "Fraction unbound of human", status = "primary", solidHeader = TRUE,width = 3,
+                            box(title = "Fraction unbound in human", status = "primary", solidHeader = TRUE,width = 3,
                                 collapsible = TRUE,
                                 numericInput("fu_h3", "fu_h:", 0.6, min = 0, max = 1,step = 0.00000000001))
                           ),
@@ -255,8 +259,8 @@ server<-function(input,output){
   Dose_h <- reactive(Dose()/(Km()[5]/Km()[1:4])/input$Factor)
   data <- reactive(tibble("Method" = c("Mouse", "Rat", 
                                        "Begale","Monkey"),
-                              "HED_human[mg]" = Dose_h()*input$Factor,
-                              "MRSD_human[mg]" = Dose_h()
+                          "HED_human[mg]" = Dose_h()*input$Factor,
+                          "MRSD_human[mg]" = Dose_h()
   )
   )
   #.........@@                                                                                               #@@此段作为参考，表头要标注清楚
@@ -295,8 +299,11 @@ server<-function(input,output){
   Dose3 <- reactive(PK_simple3()*input$AUC3)
   PK_simple33 <- reactive(33.35*(a3()*input$fu_h3/input$fu_r3)**0.77)
   Dose33 <- reactive(PK_simple33()*input$AUC3)
-  data3 <- reactive(data.frame("Method" = c("Allometric scaling", "fu Intercept Correction Method"),
-                               "Dose_h(mg)" = c(Dose3(), Dose33())))
+  data3 <- reactive(tibble("Method" = c("Allometric scaling", "fu Intercept Correction Method"),
+                               "a" = a3(),
+                               "b" = b3(),
+                               "R2" = R3(),
+                               "Dose_human[mg]" = c(Dose3(), Dose33())))
   
   # four animals
   PK4 <- reactive(c(input$PK41, input$PK42, input$PK43, input$PK44))
@@ -329,9 +336,9 @@ server<-function(input,output){
   
   data5 <- reactive(data.frame("Method" = c("CL-TS(rat-dog)"),
                                "Dose_h(mg)" = c(Dose5())))
- 
   
-
+  
+  
   #---------------------------------------------------------------------------------------------------------#
   #-------------------------------------AS model(exponent = 0.75)-------------------------------------------#
   #---------------------------------------------------------------------------------------------------------#
@@ -391,7 +398,6 @@ server<-function(input,output){
   
 }  
 shinyApp(ui,server)     
-
 
 
 
